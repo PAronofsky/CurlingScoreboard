@@ -14,8 +14,10 @@ export default class CurlingScoreboard extends Component {
     state = {
         currentEnd: 1,
         scoring: false,
-        team1Scores: [],
-        team2Scores: []
+        team1EndsScored: [],
+        team2EndsScored: [],
+        team1TotalScore: 0,
+        team2TotalScore: 0
     }
     componentDidMount() {
         ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
@@ -69,19 +71,18 @@ export default class CurlingScoreboard extends Component {
 
     _renderTeamRow (team) {
         var teamRow = [];
-        var teamScores = team == "team1" ? this.state.team1Scores : this.state.team2Scores;
-        var end = teamScores[i];
+        var teamEndsScored = team == "team1" ? this.state.team1EndsScored : this.state.team2EndsScored;
+        
         for (var i = 0; i < 20; i++) {
+            var end = teamEndsScored[i];
             if(!end){
                 teamRow.push(
-                    <TouchableHighlight key={team + "-" + i} onPress={() => this._onPressTeamScore(team, i)} style={styles.scoreView}>
-                        <View style={{flex: 1}}></View>
-                    </TouchableHighlight>
+                    this._getEmptyTeamRowItem(team, i)
                 );
             } else {
                 teamRow.push(
                     <View key={team + "-" + i} score={i} style={styles.scoreView}>
-                        {this._renderEndCard(end)}
+                        {this._renderEndCard(end, i, team)}
                     </View>
                 );
             }
@@ -89,41 +90,66 @@ export default class CurlingScoreboard extends Component {
         return teamRow;
     }
 
-    _renderEndCard (end) {
+    _getEmptyTeamRowItem (team, score) {
+        return (
+            <TouchableHighlight key={team + "-" + score} onPress={() => this._onPressTeamEndScored(team, score)} style={styles.scoreView}>
+                <View style={{flex: 1}}></View>
+            </TouchableHighlight>
+        );
+    }
+
+    _renderEndCard (end, score, team) {
         if(!end)
             end = this.state.currentEnd;
         return (
-            <TouchableHighlight onPress={() => this._onPressEndCard(end)} style={styles.endCard}>
+            <TouchableHighlight onPress={() => this._onPressEndCard(end, score, team)} style={styles.endCard}>
                 <Text style={styles.text}>{end}</Text>
             </TouchableHighlight>
         );
     }
 
-    _onPressEndCard(end) {
+    _onPressEndCard(end, score, team) {
         this.setState({
             scoring: !this.state.scoring
         });
     }
 
-    _onPressTeamScore(team, score) {
+    _onPressTeamEndScored(team, score) {
         if(!this.state.scoring)
             return;
-            
+
         var team1 = team == "team1";
-        var teamScores =  team1 ? this.state.team1Scores : this.state.team2Scores;
-        teamScores[score] = this.state.currentEnd;
+        var teamTotal = team1 ? this.state.team1TotalScore : this.state.team2TotalScore;
+        // Cannot hang card on a score less than the team's total
+        if(score <= teamTotal) {
+            this._cancelScoring()
+            return;
+        }
+
+        var teamEndsScored =  team1 ? this.state.team1EndsScored : this.state.team2EndsScored;
+
+        teamEndsScored[score] = this.state.currentEnd;
+        var currentEnd = this.state.currentEnd + 1;
         if(team1)
             this.setState({
-                team1Scores: teamScores,
-                currentEnd: this.state.currentEnd++,
+                team1EndsScored: teamEndsScored,
+                team1TotalScore: score,
+                currentEnd: currentEnd,
                 scoring: false
             });
         else
             this.setState({
-                team2Scores: teamScores,
-                currentEnd: this.state.currentEnd++,
+                team2EndsScored: teamEndsScored,
+                team2TotalScore: score,
+                currentEnd: currentEnd,
                 scoring: false
             });
+    }
+
+    _cancelScoring() {
+        this.setState({
+            scoring: false
+        });
     }
 }
 
@@ -168,6 +194,7 @@ const styles = StyleSheet.create({
     endCard: {
         borderWidth: 2,
         borderColor: '#1a1a1a',
+        backgroundColor: 'white',
         width: 50,
         height: 70,
     },
